@@ -1,0 +1,24 @@
+from twitterscraper import query_tweets
+import datetime as dt
+import pandas as pd
+
+query1="#קורונה"
+query2="from:Netanyahu"
+query3="(לגליזציה, OR קנאביס, OR קנביס, OR מריחואנה, OR גראס)"
+query4 = "(#משפט AND #ביבי)"
+q_no_retweets='-filter:retweets'
+q_no_replies='-filter:replies'
+
+list_of_tweets_Korona_hash= pd.DataFrame(query_tweets(query3+q_no_retweets+q_no_replies, begindate=dt.date(2020, 1, 1), enddate=dt.date.today(),lang='he'))
+
+
+
+list_of_tweets_texts_Korona_hash = []
+tmp = []
+
+[list_of_tweets_texts_Korona_hash.append(tweet.text) for tweet in list_of_tweets_Korona_hash if tweet.text not in list_of_tweets_texts_Korona_hash]
+
+
+pd.DataFrame(list_of_tweets_texts_Korona_hash).to_excel(r'./tweets_legalization_08_06_2020.xlsx',index=False)
+
+
