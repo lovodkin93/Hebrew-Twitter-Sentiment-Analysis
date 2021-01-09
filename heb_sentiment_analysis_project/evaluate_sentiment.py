@@ -10,7 +10,7 @@ class Evaluator:
         if test_df is not None:
             self.test_df = test_df
         else:
-            self.test_df = pd.read_csv(Path(test_path),
+            self.test_df = pd.read_csv(Path(rf'{test_path}'),
                                        encoding="utf-8",
                                        sep="\t",
                                        header=None,

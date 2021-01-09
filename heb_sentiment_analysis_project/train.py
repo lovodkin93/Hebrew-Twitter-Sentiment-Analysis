@@ -13,9 +13,6 @@ from imblearn.combine import SMOTETomek
 from sklearn.feature_selection import SelectKBest, SelectFromModel, RFE
 from sklearn.feature_selection import chi2
 
-MORPH_TRAIN_PATH = 'data/train_tweet_data_labeld_final_morph_yap.tsv' # MORPH_TRAIN_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/train_tweet_data_labeld_final_morph_yap.tsv' #path to the morphamized tsv
-MORPH_TEST_PATH = 'data/test_tweet_data_labeld_final_morph_yap.tsv' # MORPH_TEST_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/test_tweet_data_labeld_final_morph_yap.tsv' #path to the morphamized tsv
-MORPH_ALL_PATH = 'data/all_tweet_data_labeld_final_morph_yap.tsv' # MORPH_ALL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/all_tweet_data_labeld_final_morph_yap.tsv' # path to the morphamized tsv
 
 def data_balance(train_df, test_df=None, ngram=(1, 1)):
     from collections import Counter
@@ -74,24 +71,24 @@ def data_pre_processing(train_text, test_text):
 
 #
 
-def data_acquisition(config, train_path, test_path):
-    train_path = Path(train_path)
-    test_path = Path(test_path)
+def data_acquisition(config):
+    train_path = Path(rf'{config.args.train_data_path}')
+    test_path = Path(rf'{config.args.test_data_path}')
     test_raw = pd.read_csv(test_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_raw = pd.read_csv(train_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_df = morph.get_clean_data(train_raw)
     test_df = morph.get_clean_data(test_raw)
     if config.args.morph == "Yap":
         train_df = morph.yap_morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)
+                                      morph_path=config.args.morphamized_data_train_path)
         test_df = morph.yap_morph_df(test_df, tosave=True,
-                                     morph_path=MORPH_TEST_PATH)
+                                     morph_path=config.args.morphamized_data_test_path)
 
     elif config.args.morph == "Stanza":
         train_df = morph.morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)
+                                      morph_path=config.args.morphamized_data_train_path)
         test_df = morph.morph_df(test_df, tosave=True,
-                                     morph_path=MORPH_TEST_PATH)
+                                     morph_path=config.args.morphamized_data_test_path)
 
     train_df.loc[:, "label"] = train_df.label.astype("category")
     text = train_df["text"]
@@ -109,13 +106,13 @@ def data_acquisition(config, train_path, test_path):
     return train_df, test_df
 
 
-def train_all_models(train_path, test_path, config):
-    train_df, test_df = data_acquisition(config, train_path, test_path)
+def train_all_models(config):
+    train_df, test_df = data_acquisition(config)
 
     X_train_counts, X_test_counts, X_train_tf, X_test_tfidf, count_vect = data_pre_processing(train_df.text,
                                                                                               test_df.text)
 
-    evaluator = Evaluator(test_path, test_df)
+    evaluator = Evaluator(config.args.test_data_path, test_df)
 
     # trying out different classifiers
 
@@ -147,23 +144,20 @@ def train_all_models(train_path, test_path, config):
             model_dict = utils.update_dict(model_dict, model_name, clf, mic, mac, cm, acc, pred)
 
             count += 1
-    # todo your bert
     from datetime import datetime
     start_time = datetime.now()
 
-    bert = Bert_init()
-    model_name = 'bert'
-    clf, mic, mac, cm, acc, pred = train_eval_model(clf=bert, name=model_name, X_train_tf=train_df.text,
-                                                    label=train_df.label, X_test_tfidf=test_df.text, evaluator=evaluator)
-    end_time = datetime.now()
-    print('Duration: {}'.format(end_time - start_time))
-    model_dict[model_name] = {utils.CLF: clf}
-    model_dict = utils.update_dict(model_dict, model_name, clf, mic, mac, cm, acc, pred)
-
-
-
-    count += 1
-    print(f"# of models ={count}")
+    if config.args.with_bert:
+        bert = Bert_init()
+        model_name = 'bert'
+        clf, mic, mac, cm, acc, pred = train_eval_model(clf=bert, name=model_name, X_train_tf=train_df.text,
+                                                        label=train_df.label, X_test_tfidf=test_df.text, evaluator=evaluator)
+        end_time = datetime.now()
+        print('Duration: {}'.format(end_time - start_time))
+        model_dict[model_name] = {utils.CLF: clf}
+        model_dict = utils.update_dict(model_dict, model_name, clf, mic, mac, cm, acc, pred)
+        count += 1
+        print(f"# of models ={count}")
 
     return model_dict, count_vect, evaluator
 
@@ -176,17 +170,17 @@ def cv_data_pre_processing(train_text):
     return X_train_counts, X_train_tf, count_vect
 
 
-def cv_data_acquisition(config, train_path):
-    train_path = Path(train_path)
+def cv_data_acquisition(config):
+    train_path = Path(rf'{config.args.all_data_path}')
     train_raw = pd.read_csv(train_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_df = morph.get_clean_data(train_raw)
 
     if config.args.morph == "Yap":
         train_df = morph.yap_morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)
+                                      morph_path=config.args.morphamized_data_train_path)
     elif config.args.morph == "Stanza":
         train_df = morph.morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)
+                                      morph_path=config.args.morphamized_data_train_path)
     train_df.loc[:, "label"] = train_df.label.astype("category")
     text = train_df["text"]
     if config.args.print_info:
@@ -201,13 +195,13 @@ def cv_data_acquisition(config, train_path):
     return train_df
 
 
-def train_all_models_with_cv_balance(train_path, test_path, all_path, config, k=10):
-    train_df, test_df = data_acquisition(config, train_path, test_path)
-    cv_df = cv_data_acquisition(config, all_path)
+def train_all_models_with_cv_balance(config, k=10):
+    train_df, test_df = data_acquisition(config)
+    cv_df = cv_data_acquisition(config)
     cv = KFold(n_splits=k, random_state=1, shuffle=True)
     # cv_evaluator = Evaluator(test_path, cv_df)
 
-    evaluator = Evaluator(test_path, test_df)
+    evaluator = Evaluator(config.args.test_data_path, test_df)
     # we won't save these they are for baseline
     majority_classifier(test_df, evaluator, 0)
     throw_a_die_classifier(test_df, evaluator)
@@ -250,18 +244,18 @@ def train_all_models_with_cv_balance(train_path, test_path, all_path, config, k=
     return model_dict, evaluator
 
 
-def train_all_models_with_cv(train_path, test_path, all_path, config, k=10):
+def train_all_models_with_cv(config, k=10):
     # train test data
-    train_df, test_df = data_acquisition(config, train_path, test_path)
+    train_df, test_df = data_acquisition(config)
 
     X_train_counts, X_test_counts, X_train_tf, X_test_tfidf, count_vect = data_pre_processing(train_df.text,
                                                                                               test_df.text)
 
-    cv_df = cv_data_acquisition(config, all_path)
+    cv_df = cv_data_acquisition(config)
     cv_X_train_counts, cv_X_train_tf, cv_count_vect = cv_data_pre_processing(cv_df.text)
 
     cv = KFold(n_splits=k, random_state=1, shuffle=True)
-    evaluator = Evaluator(test_path, test_df)
+    evaluator = Evaluator(config.args.test_data_path, test_df)
 
     # trying out different classifiers
 

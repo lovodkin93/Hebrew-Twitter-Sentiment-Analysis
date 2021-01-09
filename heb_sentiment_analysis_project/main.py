@@ -9,25 +9,13 @@ import morphamizer as morph
 from config import Config
 import sys
 
-BEST_CV_MODEL_PATH = r'best_models\finalized_tweet_cv_model_without_balanced_data.sav' # BEST_CV_MODEL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/best_models/finalized_tweet_cv_model_without_balanced_data.sav'
-BEST_UNBIASED_DATA_CV_MODEL_PATH = r'best_models\finalized_tweet_cv_model_with_balanced_data.sav' # BEST_UNBIASED_DATA_CV_MODEL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/best_models/finalized_tweet_cv_model_with_balanced_data.sav'
-BEST_MODEL_PATH = r'best_models\finalized_tweet_model.sav' # BEST_MODEL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/best_models/finalized_tweet_model.sav'
-
-TEST_PATH = r'data\test_tweet_data_labeld_final_morph_yap.tsv' # TEST_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/test_tweet_data_labeld_final.tsv'# if morphamizing then change this one to the "... final.tsv" (the before morphamization).
-
-TRAIN_PATH = r'data\train_tweet_data_labeld_final_morph_yap.tsv' # TRAIN_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/train_tweet_data_labeld_final.tsv' #if morphamizing then change this one to the "... final.tsv" (the before morphamization).
-
-ALL_PATH = r'data\all_tweet_data_labeld_final_morph_yap.tsv' #ALL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/data/all_tweet_data_labeld_final_morph_yap.tsv'
-
-
 import pickle
-
 
 def save_model(model, filename):
     pickle.dump(model, open(filename, 'wb'))
 
 
-def load_model(filename=BEST_MODEL_PATH):
+def load_model(filename):
     return pickle.load(open(filename, 'rb'))
 
 def predict_preprocess(df, range=(1, 1)):
@@ -42,46 +30,42 @@ def predict_preprocess(df, range=(1, 1)):
 
 
 def train_model(config):
-    train_path = TRAIN_PATH
-    test_path = TEST_PATH
     if config.args.cross_validation:
         measurement = utils.ACCURACY
         print()
-        print( "############ unbias data############")
+        print( "############ unbias data ############")
         print()
-        models_dict_balanced, evaluator_balanced = train_all_models_with_cv_balance(train_path, test_path, ALL_PATH, config)
+        models_dict_balanced, evaluator_balanced = train_all_models_with_cv_balance(config)
         best_model_b, name_b, pred_b, score_b = get_best_model(models_dict_balanced, None, measurement)
         print()
-        print("############ original data   ############")
+        print("############ original data ############")
         print()
-        models_dict, count_vect, evaluator = train_all_models_with_cv(train_path, test_path, ALL_PATH, config)
+        models_dict, count_vect, evaluator = train_all_models_with_cv(config)
         best_model, name, pred, score = get_best_model(models_dict, None, measurement)
 
 
     else:
-        models_dict, count_vect, evaluator = train_all_models(train_path, test_path, config)
+        models_dict, count_vect, evaluator = train_all_models(config)
         measurement = utils.F1
         best_model, name, pred, score = get_best_model(models_dict, utils.MICRO, measurement)
     if config.args.save_model:
         if config.args.cross_validation:
-            save_model(best_model, BEST_CV_MODEL_PATH)
-            save_model(best_model_b, BEST_UNBIASED_DATA_CV_MODEL_PATH)
+            save_model(best_model, config.args.best_cv_model_path)
+            save_model(best_model_b, config.args.best_cv_unbiased_model_path)
         else:
-            save_model(best_model, BEST_MODEL_PATH)
+            save_model(best_model, config.args.best_no_cv_model_path)
 
     else:
         if config.args.cross_validation:
             if score_b < score:
-                best_model = load_model(BEST_CV_MODEL_PATH)
+                best_model = load_model(config.args.best_cv_model_path)
             else:
-                best_model = load_model(BEST_UNBIASED_DATA_CV_MODEL_PATH)
+                best_model = load_model(config.args.best_cv_unbiased_model_path)
         else:
-            best_model = load_model(BEST_MODEL_PATH)
+            best_model = load_model(config.args.best_no_cv_model_path)
     if config.args.print_info:
-
         evaluator.show_errors(pred, name)
         evaluator.show_correct(pred, name)
-
     return best_model
 
 

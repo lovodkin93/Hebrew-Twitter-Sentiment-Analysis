@@ -1,38 +1,9 @@
 import os
 import shlex
 from copy import deepcopy
-
-import dynet_config
 import numpy as np
 from configargparse import ArgParser, Namespace, ArgumentDefaultsHelpFormatter, SUPPRESS
-from logbook import Logger, FileHandler, StderrHandler
-
-
-# Classifiers
-
-SPARSE = "sparse"
-MLP = "mlp"
-BIRNN = "bilstm"
-HIGHWAY_RNN = "highway"
-HIERARCHICAL_RNN = "hbirnn"
-NOOP = "noop"
-NN_CLASSIFIERS = (MLP, BIRNN, HIGHWAY_RNN, HIERARCHICAL_RNN)
-CLASSIFIERS = (SPARSE, MLP, BIRNN, HIGHWAY_RNN, HIERARCHICAL_RNN, NOOP)
-
-FEATURE_PROPERTIES = "wmtudhencpqxyAPCIEMNT#^$"
-
-# Swap types
-REGULAR = "regular"
-COMPOUND = "compound"
-
-# Required number of edge labels per format
-EDGE_LABELS_NUM = {"amr": 110, "sdp": 70, "conllu": 60}
-SPARSE_ARG_NAMES = set()
-NN_ARG_NAMES = set()
-DYNET_ARG_NAMES = set()
-RESTORED_ARGS = set()
-
-SEPARATOR = "."
+import ast
 
 
 class FallbackNamespace(Namespace):
@@ -69,84 +40,39 @@ class FallbackNamespace(Namespace):
             yield from child.traverse(SEPARATOR.join(filter(None, (prefix, name))))
 
 
-class Hyperparams:
-    def __init__(self, parent, shared=None, **kwargs):
-        self.shared = FallbackNamespace(parent, shared)
-        self.specific = FallbackNamespace(parent)
-        for name, args in kwargs.items():
-            self.specific[name].update(args)
-
-    def items(self):
-        return ([("shared", self.shared)] if self.shared.vars() else []) + list(self.specific.traverse())
-
-
-class HyperparamsInitializer:
-    def __init__(self, name=None, *args, **kwargs):
-        """
-        :param name: name of hyperparams subset
-        :param args: raw arg strings
-        :param kwargs: parsed and initialized values
-        """
-        self.name = name
-        self.str_args = list(args) + ["--%s %s" % (k.replace("_", "-"), v) for k, v in kwargs.items()]
-
-    def __str__(self):
-        return '"%s"' % " ".join([self.name] + list(self.str_args))
-
-    def __bool__(self):
-        return bool(self.str_args)
-
-    @classmethod
-    def action(cls, args):
-        return cls(*args.replace("=", " ").split())
-
-
-class Iterations:
-    def __init__(self, args):
-        try:
-            epochs, *hyperparams = args.replace("=", " ").split()
-        except (AttributeError, ValueError):
-            epochs, *hyperparams = args,
-        self.epochs, self.hyperparams = int(epochs), HyperparamsInitializer(str(epochs), *hyperparams)
-
-    def __str__(self):
-        return str(self.hyperparams or self.epochs)
-
-
 class Config(object):
     def __init__(self, *args):
         self.arg_parser = ap = ArgParser(description="Sentiment Analysis of Tweets in Hebrew",
                                          formatter_class=ArgumentDefaultsHelpFormatter)
 
-        ap.add_argument("--cross-validation", choices=[True, False],
+        ap.add_argument("--cross-validation", choices=[True, False], type=ast.literal_eval,
                         default=True)
         ap.add_argument("--morph", choices=['Yap', 'Stanza', None],
                         default=None)
-        ap.add_argument("--print-info", choices=[True, False],
+        ap.add_argument("--print-info", choices=[True, False], type=ast.literal_eval,
                         default=True)
-        ap.add_argument("--with-stat", choices=[True, False],
+        ap.add_argument("--with-stat", choices=[True, False], type=ast.literal_eval,
                         default=True)
-        ap.add_argument("--save-model", choices=[True, False],
+        ap.add_argument("--save-model", choices=[True, False], type=ast.literal_eval,
                         default=True)
-
-
+        ap.add_argument("--train-data-path", type=str,
+                        default='../data/train_morph_data.tsv')
+        ap.add_argument("--test-data-path", type=str,
+                        default='../data/test_morph_data.tsv')
+        ap.add_argument("--all-data-path", type=str,
+                        default='../data/all_morph_data.tsv')
+        ap.add_argument("--best-no-cv-model-path", type=str,
+                        default='best_models/best_no_cv_model.sav')
+        ap.add_argument("--best-cv-model-path", type=str,
+                        default='best_models/best_cv_model.sav')
+        ap.add_argument("--best-cv-unbiased-model-path", type=str,
+                        default='best_models/best_cv_unbiased_model.sav')
+        ap.add_argument("--morphamized-data-train-path", type=str,
+                        default='../data/train_morph_data.tsv')
+        ap.add_argument("--morphamized-data-test-path", type=str,
+                        default='../data/test_morph_data.tsv')
+        ap.add_argument("--morphamized-data-all-path", type=str,
+                        default='../data/all_morph_data.tsv')
+        ap.add_argument("--with-bert", choices=[True, False], type=ast.literal_eval,
+                        default=False)
         self.args = FallbackNamespace(ap.parse_args(args if args else None))
-
-    def args_str(self, args):
-        return ["--" + ("no-" if v is False else "") + k.replace("_", "-") +
-                ("" if v is False or v is True else
-                 (" " + str(" ".join(map(str, v)) if hasattr(v, "__iter__") and not isinstance(v, str) else v)))
-                for (k, v) in sorted(args.items()) if
-                v not in (None, (), "", self.arg_parser.get_default(k))
-                and not k.startswith("_")
-                and (args.node_labels or ("node_label" not in k and "node_categor" not in k))
-                and (args.swap or "swap_" not in k)
-                and (args.swap == COMPOUND or k != "max_swap")
-                and (not args.require_connected or k != "orphan_label")
-                and (args.classifier == SPARSE or k not in SPARSE_ARG_NAMES)
-                and (args.classifier in NN_CLASSIFIERS or k not in NN_ARG_NAMES | DYNET_ARG_NAMES)
-                and k != "passages"]
-
-    def __str__(self):
-        self.args.hyperparams = [HyperparamsInitializer(name, **args.vars()) for name, args in self.hyperparams.items()]
-        return " ".join(list(self.args.passages) + self.args_str(self.args))
