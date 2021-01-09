@@ -74,24 +74,30 @@ def data_pre_processing(train_text, test_text):
 
 #
 
-def data_acquisition(train_path, test_path, to_morph, print_info=True, with_stat=True):
+def data_acquisition(config, train_path, test_path):
     train_path = Path(train_path)
     test_path = Path(test_path)
     test_raw = pd.read_csv(test_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_raw = pd.read_csv(train_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_df = morph.get_clean_data(train_raw)
     test_df = morph.get_clean_data(test_raw)
-    if to_morph:
+    if config.args.morph == "Yap":
         train_df = morph.yap_morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)  # yap_morph_def in stead of morph_df
+                                      morph_path=MORPH_TRAIN_PATH)
         test_df = morph.yap_morph_df(test_df, tosave=True,
-                                     morph_path=MORPH_TEST_PATH)  # yap_morph_def in stead of morph_df
+                                     morph_path=MORPH_TEST_PATH)
+
+    elif config.args.morph == "Stanza":
+        train_df = morph.morph_df(train_df, tosave=True,
+                                      morph_path=MORPH_TRAIN_PATH)
+        test_df = morph.morph_df(test_df, tosave=True,
+                                     morph_path=MORPH_TEST_PATH)
 
     train_df.loc[:, "label"] = train_df.label.astype("category")
     text = train_df["text"]
-    if print_info:
+    if config.args.print_info:
         utils.print_data_layout(train_df)
-    if with_stat:
+    if config.args.with_stat:
         utils.plot_character_length_histogram(text)
         utils.plot_word_number_histogram(train_df.text)
         stop = utils.get_hebrew_stopwords()
@@ -103,8 +109,8 @@ def data_acquisition(train_path, test_path, to_morph, print_info=True, with_stat
     return train_df, test_df
 
 
-def train_all_models(train_path, test_path, to_morph, print_info, with_stat):
-    train_df, test_df = data_acquisition(train_path, test_path, to_morph, print_info, with_stat)
+def train_all_models(train_path, test_path, config):
+    train_df, test_df = data_acquisition(config, train_path, test_path)
 
     X_train_counts, X_test_counts, X_train_tf, X_test_tfidf, count_vect = data_pre_processing(train_df.text,
                                                                                               test_df.text)
@@ -170,19 +176,22 @@ def cv_data_pre_processing(train_text):
     return X_train_counts, X_train_tf, count_vect
 
 
-def cv_data_acquisition(train_path, to_morph, print_info, with_stat):
+def cv_data_acquisition(config, train_path):
     train_path = Path(train_path)
     train_raw = pd.read_csv(train_path, sep="\t", encoding="utf-8", names=["text", "label"])
     train_df = morph.get_clean_data(train_raw)
 
-    if to_morph:
+    if config.args.morph == "Yap":
         train_df = morph.yap_morph_df(train_df, tosave=True,
-                                      morph_path=MORPH_TRAIN_PATH)  # yap_morph_def in stead of morph_df
+                                      morph_path=MORPH_TRAIN_PATH)
+    elif config.args.morph == "Stanza":
+        train_df = morph.morph_df(train_df, tosave=True,
+                                      morph_path=MORPH_TRAIN_PATH)
     train_df.loc[:, "label"] = train_df.label.astype("category")
     text = train_df["text"]
-    if print_info:
+    if config.args.print_info:
         utils.print_data_layout(train_df)
-    if with_stat:
+    if config.args.with_stat:
         utils.plot_character_length_histogram(text)
         utils.plot_word_number_histogram(train_df.text)
         stop = utils.get_hebrew_stopwords()
@@ -192,9 +201,9 @@ def cv_data_acquisition(train_path, to_morph, print_info, with_stat):
     return train_df
 
 
-def train_all_models_with_cv_balance(train_path, test_path, all_path, to_morph, print_info, with_stat, k=10):
-    train_df, test_df = data_acquisition(train_path, test_path, to_morph, print_info, with_stat)
-    cv_df = cv_data_acquisition(all_path, to_morph, print_info, with_stat)
+def train_all_models_with_cv_balance(train_path, test_path, all_path, config, k=10):
+    train_df, test_df = data_acquisition(config, train_path, test_path)
+    cv_df = cv_data_acquisition(config, all_path)
     cv = KFold(n_splits=k, random_state=1, shuffle=True)
     # cv_evaluator = Evaluator(test_path, cv_df)
 
@@ -233,7 +242,7 @@ def train_all_models_with_cv_balance(train_path, test_path, all_path, to_morph, 
             print("\n")
 
     print(f"# of models ={count} with balancing")
-    if print_info:
+    if config.args.print_info:
         for model in model_dict:
             print(f" model = {model}", end=' ')
             print(f"cv={model_dict[model][utils.CROSS_VALIDATION]}")
@@ -241,14 +250,14 @@ def train_all_models_with_cv_balance(train_path, test_path, all_path, to_morph, 
     return model_dict, evaluator
 
 
-def train_all_models_with_cv(train_path, test_path, all_path, to_morph, print_info, with_stat, k=10):
+def train_all_models_with_cv(train_path, test_path, all_path, config, k=10):
     # train test data
-    train_df, test_df = data_acquisition(train_path, test_path, to_morph, print_info, with_stat)
+    train_df, test_df = data_acquisition(config, train_path, test_path)
 
     X_train_counts, X_test_counts, X_train_tf, X_test_tfidf, count_vect = data_pre_processing(train_df.text,
                                                                                               test_df.text)
 
-    cv_df = cv_data_acquisition(all_path, to_morph, print_info, with_stat)
+    cv_df = cv_data_acquisition(config, all_path)
     cv_X_train_counts, cv_X_train_tf, cv_count_vect = cv_data_pre_processing(cv_df.text)
 
     cv = KFold(n_splits=k, random_state=1, shuffle=True)
@@ -287,7 +296,7 @@ def train_all_models_with_cv(train_path, test_path, all_path, to_morph, print_in
             print("\n")
 
     print(f"# of models ={count} without balancing")
-    if print_info:
+    if config.args.print_info:
         for model in model_dict:
             print(f" model = {model}", end=' ')
             print(f"cv={model_dict[model][utils.CROSS_VALIDATION]}")

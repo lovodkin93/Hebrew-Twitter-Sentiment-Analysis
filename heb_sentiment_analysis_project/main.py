@@ -6,6 +6,7 @@ from morphamizer import create_morphamaized_file
 from utils import get_strongest_words
 import utils
 import morphamizer as morph
+from config import Config
 import sys
 
 BEST_CV_MODEL_PATH = r'best_models\finalized_tweet_cv_model_without_balanced_data.sav' # BEST_CV_MODEL_PATH = r'/cs/labs/oabend/lovodkin93/workspace/project_submission5/best_models/finalized_tweet_cv_model_without_balanced_data.sav'
@@ -40,46 +41,43 @@ def predict_preprocess(df, range=(1, 1)):
     return X_tf
 
 
-def train_model(to_morph=False, print_info=True, with_stat=True, save_model_f=False, cv=True):
+def train_model(config):
     train_path = TRAIN_PATH
     test_path = TEST_PATH
-    if cv:
+    if config.args.cross_validation:
         measurement = utils.ACCURACY
         print()
         print( "############ unbias data############")
         print()
-        models_dict_balanced, evaluator_balanced = train_all_models_with_cv_balance(train_path, test_path, ALL_PATH, to_morph,
-                                                                  print_info, with_stat)
+        models_dict_balanced, evaluator_balanced = train_all_models_with_cv_balance(train_path, test_path, ALL_PATH, config)
         best_model_b, name_b, pred_b, score_b = get_best_model(models_dict_balanced, None, measurement)
         print()
         print("############ original data   ############")
         print()
-        models_dict, count_vect, evaluator = train_all_models_with_cv(train_path, test_path, ALL_PATH, to_morph,
-                                                                      print_info, with_stat)
+        models_dict, count_vect, evaluator = train_all_models_with_cv(train_path, test_path, ALL_PATH, config)
         best_model, name, pred, score = get_best_model(models_dict, None, measurement)
 
 
     else:
-        models_dict, count_vect, evaluator = train_all_models(train_path, test_path, to_morph, print_info,
-                                                              with_stat)
+        models_dict, count_vect, evaluator = train_all_models(train_path, test_path, config)
         measurement = utils.F1
         best_model, name, pred, score = get_best_model(models_dict, utils.MICRO, measurement)
-    if save_model_f:
-        if cv:
+    if config.args.save_model:
+        if config.args.cross_validation:
             save_model(best_model, BEST_CV_MODEL_PATH)
             save_model(best_model_b, BEST_UNBIASED_DATA_CV_MODEL_PATH)
         else:
             save_model(best_model, BEST_MODEL_PATH)
 
     else:
-        if cv:
+        if config.args.cross_validation:
             if score_b < score:
                 best_model = load_model(BEST_CV_MODEL_PATH)
             else:
                 best_model = load_model(BEST_UNBIASED_DATA_CV_MODEL_PATH)
         else:
             best_model = load_model(BEST_MODEL_PATH)
-    if print_info:
+    if config.args.print_info:
 
         evaluator.show_errors(pred, name)
         evaluator.show_correct(pred, name)
@@ -89,4 +87,4 @@ def train_model(to_morph=False, print_info=True, with_stat=True, save_model_f=Fa
 
 if __name__ == "__main__":
     # main()
-    model = train_model(cv=True, to_morph=False, print_info=True, with_stat=True, save_model_f=True)
+    model = train_model(config=Config())
