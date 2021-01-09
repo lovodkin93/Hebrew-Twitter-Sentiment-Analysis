@@ -47,8 +47,6 @@ class Config(object):
 
         ap.add_argument("--cross-validation", choices=[True, False], type=ast.literal_eval,
                         default=True)
-        ap.add_argument("--morph", choices=['Yap', 'Stanza', None],
-                        default=None)
         ap.add_argument("--print-info", choices=[True, False], type=ast.literal_eval,
                         default=True)
         ap.add_argument("--with-stat", choices=[True, False], type=ast.literal_eval,
@@ -67,12 +65,12 @@ class Config(object):
                         default='best_models/best_cv_model.sav')
         ap.add_argument("--best-cv-unbiased-model-path", type=str,
                         default='best_models/best_cv_unbiased_model.sav')
+        ap.add_argument("--with-bert", choices=[True, False], type=ast.literal_eval,
+                        default=False)
+        ap.add_argument("--morph", choices=['Yap', 'Stanza', None],
+                        default=None)
         ap.add_argument("--morphamized-data-train-path", type=str,
                         default='../data/train_morph_data.tsv')
         ap.add_argument("--morphamized-data-test-path", type=str,
                         default='../data/test_morph_data.tsv')
-        ap.add_argument("--morphamized-data-all-path", type=str,
-                        default='../data/all_morph_data.tsv')
-        ap.add_argument("--with-bert", choices=[True, False], type=ast.literal_eval,
-                        default=False)
         self.args = FallbackNamespace(ap.parse_args(args if args else None))
