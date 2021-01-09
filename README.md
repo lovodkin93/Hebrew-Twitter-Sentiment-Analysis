@@ -26,3 +26,9 @@ possible flags:
 10. `--best-cv-unbiased-model-path` path to the pre-trained model that uses cross validation (if `--save-model=False`) and that unbiases biased data or the path where to save such trained model (if `--save-model=True`). Of str type (default: `best_models/best_cv_unbiased_model.sav`).
 11. `--with-bert` whether to test also the Bert model. Applicable only when `--cross-validation=False`). of boolean type(default:False).
 
+In addition, if the data has not been tokenized and morphamized yet, it is possible use one of the following morphamizers to pre-process the data:
+1. Stanze
+2. Yap
+
+Currently, these two tools are the best ones that support the Hebrew language, as current SpaCy doesn't support this language.
+Also, in the case that Yap is used, it is necessary to properly install it (for more information, see [Yap](https://github.com/onlplab/yap)) 
